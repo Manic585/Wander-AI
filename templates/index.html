@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Travel Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="planner-panel" aria-labelledby="app-title">
+        <div class="brand-row">
+          <div class="brand-mark" aria-hidden="true">
+            <span></span>
+          </div>
+          <div>
+            <p class="eyebrow">Multi Agent Travel Planner</p>
+            <h1 id="app-title">Plan a complete trip with flights, stays, and itinerary.</h1>
+          </div>
+        </div>
+
+        <form id="travel-form" class="travel-form">
+          <label for="user-input">Trip request</label>
+          <textarea
+            id="user-input"
+            name="user_input"
+            rows="7"
+            maxlength="1200"
+            placeholder="Plan a 7 day trip from India to China covering flights, hotels, sightseeing places for 5 people"
+            required
+          ></textarea>
+
+          <div class="form-grid">
+            <div>
+              <label for="thread-id">Thread ID</label>
+              <input id="thread-id" name="thread_id" type="text" placeholder="Optional" />
+            </div>
+            <div class="quick-prompts" aria-label="Example trip requests">
+              <button type="button" data-prompt="Plan a 5 day family trip from Chennai to Singapore with flights, hotels, sightseeing, and budget.">
+                Singapore
+              </button>
+              <button type="button" data-prompt="Plan a 4 day budget trip from India to Dubai for 3 friends with flights, hotels, and attractions.">
+                Dubai
+              </button>
+              <button type="button" data-prompt="Plan a 7 day trip from India to Japan covering flights, hotels, sightseeing places, and estimated budget.">
+                Japan
+              </button>
+            </div>
+          </div>
+
+          <button id="submit-button" class="primary-action" type="submit">
+            <span class="button-icon" aria-hidden="true">✦</span>
+            Generate Plan
+          </button>
+        </form>
+      </section>
+
+      <section class="status-panel" aria-label="Agent progress">
+        <div class="route-visual" aria-hidden="true">
+          <div class="sun"></div>
+          <div class="path-line"></div>
+          <div class="pin pin-origin"></div>
+          <div class="pin pin-destination"></div>
+          <div class="plane">✈</div>
+        </div>
+
+        <div class="progress-list">
+          <article class="step-card" data-step="flight">
+            <span class="step-dot"></span>
+            <div>
+              <h2>Flight Agent</h2>
+              <p>Waiting</p>
+            </div>
+          </article>
+          <article class="step-card" data-step="hotel">
+            <span class="step-dot"></span>
+            <div>
+              <h2>Hotel Agent</h2>
+              <p>Waiting</p>
+            </div>
+          </article>
+          <article class="step-card" data-step="itinerary">
+            <span class="step-dot"></span>
+            <div>
+              <h2>Itinerary Agent</h2>
+              <p>Waiting</p>
+            </div>
+          </article>
+          <article class="step-card" data-step="final">
+            <span class="step-dot"></span>
+            <div>
+              <h2>Final Agent</h2>
+              <p>Waiting</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="results" class="results-panel" hidden>
+        <div class="result-header">
+          <div>
+            <p class="eyebrow">Travel Response</p>
+            <h2>Your Trip Plan</h2>
+          </div>
+          <div class="run-meta">
+            <span id="thread-label">Thread: --</span>
+            <span id="calls-label">Calls: --</span>
+          </div>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="Travel plan sections">
+          <button class="tab-button active" type="button" role="tab" aria-selected="true" data-target="answer">Final Plan</button>
+          <button class="tab-button" type="button" role="tab" aria-selected="false" data-target="flights">Flights</button>
+          <button class="tab-button" type="button" role="tab" aria-selected="false" data-target="hotels">Hotels</button>
+          <button class="tab-button" type="button" role="tab" aria-selected="false" data-target="itinerary">Itinerary</button>
+        </div>
+
+        <article id="answer" class="result-content active" role="tabpanel"></article>
+        <article id="flights" class="result-content" role="tabpanel"></article>
+        <article id="hotels" class="result-content" role="tabpanel"></article>
+        <article id="itinerary" class="result-content" role="tabpanel"></article>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <script src="{{ url_for('static', path='vendor/marked.umd.js') }}"></script>
+    <script src="{{ url_for('static', path='vendor/purify.min.js') }}"></script>
+    <script src="{{ url_for('static', path='script.js') }}"></script>
+  </body>
+</html>
