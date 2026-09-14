@@ -194,3 +194,5 @@ git diff --check
 - Restart the FastAPI process after changing `.env` values.
 - Browser vendor files under `static/vendor/` are committed intentionally so
   the UI does not depend on a CDN.
+
+  
