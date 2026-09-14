@@ -26,9 +26,35 @@ from langchain_core.messages import (
     SystemMessage,
 )
 from langchain_groq import ChatGroq
-from tools.flight_tool import search_flights
+
+# from tools.flight_tool import search_flights
 from response_text import strip_thinking, visible_model_response
-from mcp_client_test import tavily_mcp_search
+from mcp_client import tavily_mcp_search, aviation_mcp_call
+
+FLIGHT_AGENT_PROMPT = """
+You are a travel flight expert
+
+User Query : 
+{query}
+
+Airport information:
+{airport_data}
+
+Airline information:
+{airline_data}
+
+Generate:
+
+1. Likely departure airport
+2. Likely arrival airport
+3. Airlines serving the route
+4. Flight duration
+5. Airfare rate
+6. Peak season pricing warning
+7. Booking advice
+
+Return concise travel guidance
+"""
 
 
 def get_database_url():
@@ -101,7 +127,25 @@ class TravelState(TypedDict):
 
 def flight_agent(state: TravelState):
     query = state["user_query"]
-    flight_data = search_flights(query, limit=3)
+    # flight_data = search_flights(query, limit=3)
+
+    try:
+        airports = asyncio.run(aviation_mcp_call("list_airports"))
+        airlines = asyncio.run(aviation_mcp_call("list_airlines"))
+
+        prompt = FLIGHT_AGENT_PROMPT.format(
+            query=query, airport_data=airports, airline_data=airlines
+        )
+
+        llm.invoke(
+            [
+                SystemMessage("You are an expert travel flight planner"),
+                HumanMessage(content=prompt),
+            ]
+        )
+
+    except Exception as e:
+        flight_data = f"Flight information unavailable - {str(e)}"
 
     return {
         "flight_results": flight_data,
