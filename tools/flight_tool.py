@@ -9,7 +9,7 @@ import pycountry
 import requests
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env", override=True)
 
 # Use Certifi's CA bundle so HTTPS requests work consistently across local
 # machines, virtual environments, and macOS Python installs.
