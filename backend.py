@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 import certifi
 from dotenv import load_dotenv
+import asyncio
+import json
 
 load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env", override=True)
 
@@ -25,8 +27,8 @@ from langchain_core.messages import (
 )
 from langchain_groq import ChatGroq
 from tools.flight_tool import search_flights
-from tools.tavily_tool import tavily_search
 from response_text import strip_thinking, visible_model_response
+from mcp_client_test import tavily_mcp_search
 
 
 def get_database_url():
@@ -63,8 +65,21 @@ MAX_HOTEL_PROMPT_CHARS = 3500
 MAX_ITINERARY_PROMPT_CHARS = 5500
 
 
+def ensure_text(value) -> str:
+    if isinstance(value, str):
+        return value
+
+    if value is None:
+        return ""
+
+    try:
+        return json.dumps(value, ensure_ascii=False, indent=2)
+    except TypeError:
+        return str(value)
+
+
 def trim_for_prompt(value: str, max_chars: int) -> str:
-    text = (value or "").strip()
+    text = ensure_text(value).strip()
 
     if len(text) <= max_chars:
         return text
@@ -97,7 +112,7 @@ def flight_agent(state: TravelState):
 
 def hotel_agent(state: TravelState):
     query = f"Best hotels for {state['user_query']}"
-    hotel_data = tavily_search(query)
+    hotel_data = ensure_text(asyncio.run(tavily_mcp_search(query)))
 
     return {
         "hotel_results": hotel_data,

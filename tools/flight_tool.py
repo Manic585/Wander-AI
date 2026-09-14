@@ -27,6 +27,22 @@ AIRPORTS = airportsdata.load("IATA")
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
 
+def ensure_text(value) -> str:
+    if isinstance(value, str):
+        return value
+
+    if isinstance(value, list):
+        return " ".join(ensure_text(item) for item in value)
+
+    if isinstance(value, dict):
+        return " ".join(f"{key}: {ensure_text(val)}" for key, val in value.items())
+
+    if value is None:
+        return ""
+
+    return str(value)
+
+
 def load_json_mapping(filename: str) -> dict[str, str]:
     """Load static lookup maps used to resolve user text into IATA codes."""
     with (DATA_DIR / filename).open(encoding="utf-8") as file:
@@ -40,6 +56,7 @@ CITY_MAIN_AIRPORT = load_json_mapping("city_main_airport.json")
 
 def clean_text(text: str) -> str:
     """Normalize natural-language locations before matching them."""
+    text = ensure_text(text)
     text = text.lower().strip()
     text = re.sub(r"[^a-z0-9\s]", " ", text)
     text = re.sub(r"\s+", " ", text)
@@ -166,7 +183,7 @@ def resolve_location_to_iata(location: str):
     if not location:
         return None
 
-    raw_location = location.strip()
+    raw_location = ensure_text(location).strip()
 
     # Direct IATA code, such as "MAA" or "JFK".
     if re.fullmatch(r"[A-Za-z]{3}", raw_location):
@@ -226,7 +243,7 @@ def find_location_mentions(query: str):
     Finds country or city names inside a natural language query.
     """
 
-    q = query.lower()
+    q = ensure_text(query).lower()
     mentions = []
 
     # Check curated aliases first so common user wording wins over formal names.
@@ -266,7 +283,7 @@ def parse_route(query: str):
     None, NRT   -> all flights to NRT
     """
 
-    q = query.strip()
+    q = ensure_text(query).strip()
     q_lower = q.lower()
 
     # Global queries should call the API without departure/arrival filters.

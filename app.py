@@ -43,7 +43,11 @@ def create_travel_plan(payload: TravelRequest):
     except Exception as exc:
         error_message = str(exc)
 
-        if "request_too_large" in error_message or "Request Entity Too Large" in error_message or "413" in error_message:
+        if (
+            "request_too_large" in error_message
+            or "Request Entity Too Large" in error_message
+            or "413" in error_message
+        ):
             raise HTTPException(
                 status_code=413,
                 detail=(
