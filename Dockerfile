@@ -15,7 +15,7 @@ COPY requirements.txt ./
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt
 
-COPY app.py backend.py main.py response_text.py ./
+COPY app.py backend.py main.py response_text.py mcp_client_test.py ./
 COPY templates ./templates
 COPY static ./static
 COPY tools ./tools
