@@ -1,5 +1,7 @@
 from tools.tavily_tool import tavily_search
-from mcp_client_test import get_all_tools, tavily_mcp_search
+
+# from mcp_client_test import get_all_tools, tavily_mcp_search
+from mcp_client import get_all_tools
 import asyncio
 
 # def run_tavily_smoke():
@@ -20,7 +22,7 @@ import asyncio
 
 if __name__ == "__main__":
     # run_tavily_smoke()
-    # asyncio.run(get_all_tools())
-    asyncio.run(
-        tavily_mcp_search("Top 10 Tamil films that got released in the year 2023")
-    )
+    asyncio.run(get_all_tools())
+    # asyncio.run(
+    #     tavily_mcp_search("Top 10 Tamil films that got released in the year 2023")
+    # )

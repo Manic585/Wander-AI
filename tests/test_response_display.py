@@ -51,6 +51,8 @@ class AgentResponseTests(unittest.TestCase):
             "DATABASE_URL": "postgresql://user:password@localhost:5432/test",
             "GROQ_API_KEY": "test-groq-key",
             "TAVILY_API_KEY": "test-tavily-key",
+            "AVIATIONSTACK_API_KEY": "test-aviation-key",
+            "OPENWEATHER_API_KEY": "test-weather-key",
         }
         with patch.dict(os.environ, env), patch("psycopg.connect"), patch(
             "langgraph.checkpoint.postgres.PostgresSaver", return_value=saver
@@ -63,10 +65,16 @@ class AgentResponseTests(unittest.TestCase):
 
         text = "Full source detail. " * 1000 + "END OF SOURCE"
         state = {"user_query": "A four day trip", "llm_calls": 0}
-        with patch.object(self.backend, "search_flights", return_value=text), patch.object(
-            self.backend, "tavily_mcp_search", new=AsyncMock(return_value=text)
-        ):
-            self.assertEqual(self.backend.flight_agent(state)["flight_results"], text)
+        with patch.object(
+            self.backend, "aviation_mcp_call", new=AsyncMock(return_value=text)
+        ), patch.object(self.backend, "llm") as llm:
+            llm.invoke.return_value = AIMessage(content="<think>notes</think>## Flight Guidance\nUse DXB")
+            self.assertEqual(
+                self.backend.flight_agent(state)["flight_results"],
+                "## Flight Guidance\nUse DXB",
+            )
+
+        with patch.object(self.backend, "tavily_mcp_search", new=AsyncMock(return_value=text)):
             self.assertEqual(self.backend.hotel_agent(state)["hotel_results"], text)
 
         with patch.object(self.backend, "tavily_mcp_search", new=AsyncMock(return_value=[{"title": "Hotel", "content": "Full stay detail"}])):
@@ -106,6 +114,28 @@ class AgentResponseTests(unittest.TestCase):
         from tools.flight_tool import parse_route
 
         self.assertEqual(parse_route(["from India", "to Dubai"]), ("DEL", "DXB"))
+
+    def test_weather_server_is_registered_in_mcp_client(self):
+        self.assertIn("weather", self.backend.aviation_mcp_call.__globals__["servers"])
+
+    def test_weather_tools_are_initialized_and_defined(self):
+        from types import SimpleNamespace
+
+        async def fake_get_tools(*, server_name=None):
+            self.assertEqual(server_name, "weather")
+            return [
+                SimpleNamespace(name="get_current_weather"),
+                SimpleNamespace(name="get_forecast"),
+            ]
+
+        mcp_globals = self.backend.aviation_mcp_call.__globals__
+        with patch.object(mcp_globals["client"], "get_tools", new=fake_get_tools):
+            import asyncio
+
+            asyncio.run(mcp_globals["initialize_weather_tools"]())
+
+        self.assertEqual(mcp_globals["current_weather_tool"].name, "get_current_weather")
+        self.assertEqual(mcp_globals["forecast_tool"].name, "get_forecast")
 
 
 if __name__ == "__main__":
