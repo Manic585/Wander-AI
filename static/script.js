@@ -9,12 +9,13 @@ const fields = {
   answer: document.querySelector("#answer"),
   flights: document.querySelector("#flights"),
   hotels: document.querySelector("#hotels"),
+  weather: document.querySelector("#weather"),
   itinerary: document.querySelector("#itinerary"),
   thread: document.querySelector("#thread-label"),
   calls: document.querySelector("#calls-label"),
 };
 
-const steps = ["flight", "hotel", "itinerary", "final"];
+const steps = ["flight", "hotel", "weather", "itinerary", "final"];
 let progressTimer = null;
 
 function showToast(message) {
@@ -117,6 +118,7 @@ function renderResults(data) {
   fields.answer.innerHTML = formatResponse(data.answer);
   fields.flights.innerHTML = formatResponse(data.flight_results);
   fields.hotels.innerHTML = formatResponse(data.hotel_results);
+  fields.weather.innerHTML = formatResponse(data.weather_results);
   fields.itinerary.innerHTML = formatResponse(data.itinerary);
   document.querySelectorAll(".result-content table").forEach((table) => {
     const wrapper = document.createElement("div");

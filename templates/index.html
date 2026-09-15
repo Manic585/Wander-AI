@@ -85,6 +85,13 @@
               <p>Waiting</p>
             </div>
           </article>
+          <article class="step-card" data-step="weather">
+            <span class="step-dot"></span>
+            <div>
+              <h2>Weather Agent</h2>
+              <p>Waiting</p>
+            </div>
+          </article>
           <article class="step-card" data-step="itinerary">
             <span class="step-dot"></span>
             <div>
@@ -118,12 +125,14 @@
           <button class="tab-button active" type="button" role="tab" aria-selected="true" data-target="answer">Final Plan</button>
           <button class="tab-button" type="button" role="tab" aria-selected="false" data-target="flights">Flights</button>
           <button class="tab-button" type="button" role="tab" aria-selected="false" data-target="hotels">Hotels</button>
+          <button class="tab-button" type="button" role="tab" aria-selected="false" data-target="weather">Weather</button>
           <button class="tab-button" type="button" role="tab" aria-selected="false" data-target="itinerary">Itinerary</button>
         </div>
 
         <article id="answer" class="result-content active" role="tabpanel"></article>
         <article id="flights" class="result-content" role="tabpanel"></article>
         <article id="hotels" class="result-content" role="tabpanel"></article>
+        <article id="weather" class="result-content" role="tabpanel"></article>
         <article id="itinerary" class="result-content" role="tabpanel"></article>
       </section>
     </main>
