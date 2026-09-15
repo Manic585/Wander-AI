@@ -12,6 +12,8 @@ UI.
 - LangGraph workflow with flight, hotel, itinerary, and final response agents.
 - Groq chat model integration through LangChain.
 - Tavily hotel/web search integration.
+- Tavily MCP helper for hotel search.
+- Local weather MCP server with current weather and forecast tools.
 - Aviationstack flight lookup integration.
 - PostgreSQL checkpointing through `langgraph-checkpoint-postgres`.
 - Markdown response rendering in the browser with local Marked and DOMPurify
@@ -58,6 +60,7 @@ Required values:
 GROQ_API_KEY=your_groq_api_key
 TAVILY_API_KEY=your_tavily_api_key
 AVIATIONSTACK_API_KEY=your_aviationstack_api_key
+OPENWEATHER_API_KEY=your_openweather_api_key
 DATABASE_URL=postgresql://user:password@host:5432/database
 ```
 
@@ -166,6 +169,8 @@ git diff --check
 .
 ├── app.py
 ├── backend.py
+├── mcp_client.py
+├── weather_mcp_server.py
 ├── response_text.py
 ├── main.py
 ├── Dockerfile
