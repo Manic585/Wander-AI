@@ -29,7 +29,13 @@ from langchain_groq import ChatGroq
 
 # from tools.flight_tool import search_flights
 from response_text import strip_thinking, visible_model_response
-from mcp_client import tavily_mcp_search, aviation_mcp_call
+from mcp_client import (
+    tavily_mcp_search,
+    aviation_mcp_call,
+    extract_destination,
+    get_current_weather,
+    get_forecast,
+)
 
 FLIGHT_AGENT_PROMPT = """
 You are a travel flight expert
@@ -123,26 +129,29 @@ class TravelState(TypedDict):
     hotel_results: str
     itinerary: str
     llm_calls: int
+    weather_results: str
 
 
 def flight_agent(state: TravelState):
     query = state["user_query"]
-    # flight_data = search_flights(query, limit=3)
 
     try:
-        airports = asyncio.run(aviation_mcp_call("list_airports"))
-        airlines = asyncio.run(aviation_mcp_call("list_airlines"))
+        airports = asyncio.run(aviation_mcp_call("list_airports", {}))
+        airlines = asyncio.run(aviation_mcp_call("list_airlines", {}))
 
         prompt = FLIGHT_AGENT_PROMPT.format(
-            query=query, airport_data=airports, airline_data=airlines
+            query=query,
+            airport_data=trim_for_prompt(airports, MAX_FLIGHT_PROMPT_CHARS),
+            airline_data=trim_for_prompt(airlines, MAX_FLIGHT_PROMPT_CHARS),
         )
 
-        llm.invoke(
+        response = llm.invoke(
             [
-                SystemMessage("You are an expert travel flight planner"),
+                SystemMessage(content="You are an expert travel flight planner"),
                 HumanMessage(content=prompt),
             ]
         )
+        flight_data = visible_model_response(response)
 
     except Exception as e:
         flight_data = f"Flight information unavailable - {str(e)}"
@@ -165,9 +174,34 @@ def hotel_agent(state: TravelState):
     }
 
 
+def weather_agent(state: TravelState):
+
+    city = extract_destination(state["user_query"])
+
+    if city == "NA":
+        weather_results = "Weather information unavailable: destination not found."
+    else:
+        try:
+            weather_data = asyncio.run(get_current_weather(city))
+            forecast_data = asyncio.run(get_forecast(city))
+            weather_results = f"""
+            Current Weather: {ensure_text(weather_data)}
+            Forecast: {ensure_text(forecast_data)}
+            """
+        except Exception as exc:
+            weather_results = f"Weather information unavailable - {str(exc)}"
+
+    return {
+        "weather_results": weather_results.strip(),
+        "llm_calls": state.get("llm_calls", 0) + 1,
+        "messages": [AIMessage(content="Weather results fetched")],
+    }
+
+
 def itinerary_agent(state: TravelState):
     flight_results = trim_for_prompt(state["flight_results"], MAX_FLIGHT_PROMPT_CHARS)
     hotel_results = trim_for_prompt(state["hotel_results"], MAX_HOTEL_PROMPT_CHARS)
+    weather_results = state.get("weather_results", "")
 
     prompt = f"""
         Create a complete travel itinerary.
@@ -180,6 +214,9 @@ def itinerary_agent(state: TravelState):
 
         Hotel Results:
         {hotel_results}
+
+        Weather Results:
+        {trim_for_prompt(weather_results, MAX_HOTEL_PROMPT_CHARS)}
 
         Make the itinerary practical, budget-aware, and easy to follow.
         Return only the travel plan in Markdown with ## headings and lists.
@@ -204,6 +241,7 @@ def itinerary_agent(state: TravelState):
 def final_agent(state: TravelState):
     flight_results = trim_for_prompt(state["flight_results"], 1800)
     hotel_results = trim_for_prompt(state["hotel_results"], 1800)
+    weather_results = state.get("weather_results", "")
     itinerary = trim_for_prompt(
         strip_thinking(state["itinerary"]), MAX_ITINERARY_PROMPT_CHARS
     )
@@ -219,6 +257,9 @@ def final_agent(state: TravelState):
 
             Hotel Summary Source:
             {hotel_results}
+
+            Weather:
+            {weather_results}
 
             Itinerary Results:
             {itinerary}
@@ -255,12 +296,14 @@ graph = StateGraph(TravelState)
 
 graph.add_node("flight_agent", flight_agent)
 graph.add_node("hotel_agent", hotel_agent)
+graph.add_node("weather_agent", weather_agent)
 graph.add_node("itinerary_agent", itinerary_agent)
 graph.add_node("final_agent", final_agent)
 
 graph.add_edge(START, "flight_agent")
 graph.add_edge("flight_agent", "hotel_agent")
-graph.add_edge("hotel_agent", "itinerary_agent")
+graph.add_edge("hotel_agent", "weather_agent")
+graph.add_edge("weather_agent", "itinerary_agent")
 graph.add_edge("itinerary_agent", "final_agent")
 graph.add_edge("final_agent", END)
 
@@ -287,6 +330,7 @@ def run_travel_agent(user_input: str, thread_id: str | None = None):
             "user_query": user_input,
             "flight_results": "",
             "hotel_results": "",
+            "weather_results": "",
             "itinerary": "",
             "llm_calls": 0,
         },
@@ -300,6 +344,7 @@ def run_travel_agent(user_input: str, thread_id: str | None = None):
         "answer": final_response,
         "flight_results": result.get("flight_results", ""),
         "hotel_results": result.get("hotel_results", ""),
+        "weather_results": result.get("weather_results", ""),
         "itinerary": result.get("itinerary", ""),
         "llm_calls": result.get("llm_calls", 0),
     }
