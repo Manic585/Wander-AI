@@ -10,7 +10,7 @@ load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env", override=True)
 os.environ["SSL_CERT_FILE"] = certifi.where()
 os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
 
-from typing import TypedDict, Annotated
+from typing import TypedDict, Annotated, Any
 import operator
 import uuid
 
@@ -60,6 +60,48 @@ Generate:
 7. Booking advice
 
 Return concise travel guidance
+"""
+
+GUARDRAIL_PROMPT = """
+Determine whether the following request belongs to travel planning or travel inforation. Valid requests can include destinations, flights, hotels, weather, budgets, visas, transportation, sightseeing, food, packing, itineraries etc
+
+Block clearly unrelated requests having harmful or illegal instructions. Don't block a valid travel request merely because some fields are missing
+
+Return strict JSON only:
+{{
+"allowed" : True,
+"reason: ""
+}}
+
+User request : {query}
+"""
+
+SUPERVISOR_PROMPT = """
+You are the supervisor agent of a multi agent travel planning system.
+Choose only the specialist agents needed for the request. 
+
+Available agents :
+- flight_agent : flights, airports, airlines, airfares, routes, booking advice
+- hotel_agent : hotels, accomodation, stay, places, neighborhood
+- weather_agent : weather, climate, season, rainy, sunny, forecast, packing advice
+- budget_agent : budget, cost, affordability, money, price, feasibility
+- itinerary_agent : itinerary, travel plan - creates the integrated travel plan and must always be included.
+
+Return strict JSON using this schema :
+{{
+    "selected_agents": ["flight_agent", "hotel_agent", "weather_agent", "budget_agent", "itinerary_agent"],
+    "trip_constraints": {{
+        "destination": "",
+        "origin": "",
+        "duration": "",
+        "budget": "",
+        "travel_style": "",
+        "special_preferences": []
+    }},
+    "supervisor_reasoning": ""
+}}
+
+User request : {query}
 """
 
 
@@ -125,11 +167,158 @@ def trim_for_prompt(value: str, max_chars: int) -> str:
 class TravelState(TypedDict):
     messages: Annotated[list[AnyMessage], operator.add]
     user_query: str
+
+    # Supervisor and guardrail state
+    guardrail_allowed: bool  # Request is allowed or not
+    guardrail_reason: str  # Reason for rejection
+    selected_agents: list[str]  # Agents for the query
+    trip_constraints: dict[str, Any]  # Constraints found in the query
+    supervisor_reasoning: str  # Why supervisor agent picks the specific agents
+
     flight_results: str
     hotel_results: str
-    itinerary: str
-    llm_calls: int
     weather_results: str
+    itinerary: str
+
+    budget_results: str
+    approval_request: str  # When user approves
+    isApproved: bool  # True or false
+    human_feedback: str  # If rejected, what is the feedback
+    final_response: str  # Final agent response
+
+    llm_calls: int
+
+
+KNOWN_AGENTS = {
+    "flight_agent",
+    "hotel_agent",
+    "weather_agent",
+    "budget_agent",
+    "itinerary_agent",
+}
+
+AGENT_ORDER = {
+    "flight_agent",
+    "hotel_agent",
+    "weather_agent",
+    "budget_agent",
+    "itinerary_agent",
+}
+
+
+# Helper functions
+
+
+def llm_invoke(user_message: str, system_message: str):
+    response = llm.invoke(
+        [SystemMessage(content=system_message), HumanMessage(content=user_message)]
+    )
+    return str(response.content)
+
+
+def json_from_llm(text: str) -> dict[str, any]:
+    """Extract the first complete JSON object from the model"""
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        raise ValueError("No complete JSON object found")
+    return json.loads(text[start : end + 1])
+
+
+def empty_constraints() -> dict[str, Any]:
+    return {
+        "destination": "",
+        "origin": "",
+        "duration": "",
+        "budget": "",
+        "travel_style": "",
+        "special_preferences": [],
+    }
+
+
+def supervisor_agent(state: TravelState):
+    query = state["user_query"]
+    llm_calls = state.get("llm_calls", 0)
+
+    # Guardrail for the request
+    try:
+        prompt = GUARDRAIL_PROMPT.format(query=query)
+        response = llm_invoke(
+            prompt,
+            "You are the input guardrail for a travel planning application. Return strict JSON only",
+        )
+        json_from_llm(response)
+
+        guardrail_result = json_from_llm(response)
+        allowed = bool(guardrail_result.get("allowed", True))
+        guardrail_reason = str(guardrail_result.get("reason", "")).strip()
+        llm_calls += 1
+    except Exception as ex:
+        print(f"Guardrail rejected the request {ex}")
+        allowed = True
+        guardrail_reason = "Guardrail validation fallback allowed the request"
+    if not allowed:
+        guardrail_reason = "Wander AI can only help with travel planning requests. Please provide your query for valid travel related planning"
+        return {
+            "messages": [
+                AIMessage(content=f"Guardrail blocked the request {guardrail_reason}")
+            ],
+            "guardrail_allowed": False,
+            "guardrail_reason": guardrail_reason,
+            "selected_agents": [],
+            "trip_constraints": empty_constraints(),
+            "supervisor_reasoning": "",
+            "llm_calls": llm_calls,
+        }
+
+    try:
+        prompt = SUPERVISOR_PROMPT.format(query=query)
+        response = llm_invoke(
+            prompt,
+            "You are a supervisor agent in a multi agent travel planner. Return strict JSON only",
+        )
+        supervisor_result = json_from_llm(response)
+        returned_agents = supervisor_result.get("selected_agents", [])
+        selected_agents = [agent for agent in AGENT_ORDER if agent in returned_agents]
+        if "itinerary_agent" not in selected_agents:
+            selected_agents.append("itinerary_agent")
+        trip_constraints = supervisor_agent.get("trip_constraints", {})
+        supervisor_reasoning = str(
+            supervisor_agent.get("supervisor_reasoning", "")
+        ).strip()
+        llm_calls += 1
+
+    except Exception as ex:
+        print(f"Supervisor agent fallback used {ex}")
+        selected_agents = AGENT_ORDER.copy()
+        trip_constraints = empty_constraints()
+        supervisor_reasoning = """
+        Supervisor agent failed. So the original travel workflow comprising all the agents is executed
+        """
+
+    return {
+        "selected_agents": selected_agents,
+        "trip_constraints": trip_constraints,
+        "supervisor_reasoning": supervisor_reasoning,
+        "guardrail_allowed": True,
+        "guardrail_reason": guardrail_reason,
+        "messages": [
+            AIMessage(content="Supervisor picked the specific agents for the query")
+        ],
+        "llm_calls": llm_calls,
+    }
+
+
+def guardrail_blocked_agent(state: TravelState):
+    reason = (
+        state.get("guardrail_reason")
+        or "Wander AI can only help with travel planning requests. Please provide your query for valid travel related planning"
+    )
+    return {
+        "guardrail_allowed": False,
+        "final_response": reason,
+        "messages": [AIMessage(content=reason)],
+    }
 
 
 def flight_agent(state: TravelState):
@@ -195,6 +384,43 @@ def weather_agent(state: TravelState):
         "weather_results": weather_results.strip(),
         "llm_calls": state.get("llm_calls", 0) + 1,
         "messages": [AIMessage(content="Weather results fetched")],
+    }
+
+
+def budget_agent(state: TravelState):
+    prompt = f"""
+    Analyse whether the trip is realistic for the user's budget
+
+    User query : 
+    {state["user_query"]}
+
+    Trip constraints : 
+    {state["trip_constraints"]}
+
+    Flight Results:
+    {state.get("flight_results", "")}
+
+    Hotel Results:
+    {state.get("hotel_results", "")}
+
+    Weather Results:
+    {state.get("weather_results", "")}
+
+    Return 
+    1. Estimated Cost categories
+    2. Budget risk areas
+    3. Money saving suggestions
+    4. Overall feasibility
+
+    If exact live prices are unavailable, clearly label them as approximate. 
+
+    """
+    response = llm_invoke(prompt, "You are a practical travel budget analyst")
+
+    return {
+        "budget_results": response,
+        "messages": [AIMessage("Budget results generated successfully")],
+        "llm_calls": state.get("llm_calls", 0) + 1,
     }
 
 
