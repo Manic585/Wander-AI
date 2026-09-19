@@ -4,18 +4,26 @@ const userInput = document.querySelector("#user-input");
 const threadInput = document.querySelector("#thread-id");
 const resultsPanel = document.querySelector("#results");
 const toast = document.querySelector("#toast");
+const approvalPanel = document.querySelector("#approval-panel");
+const approvalQuestion = document.querySelector("#approval-question");
+const approvalDraft = document.querySelector("#approval-draft");
+const approvalForm = document.querySelector("#approval-form");
+const approvalFeedback = document.querySelector("#approval-feedback");
+const approveButton = document.querySelector("#approve-button");
+const reviseButton = document.querySelector("#revise-button");
 
 const fields = {
   answer: document.querySelector("#answer"),
   flights: document.querySelector("#flights"),
   hotels: document.querySelector("#hotels"),
   weather: document.querySelector("#weather"),
+  budget: document.querySelector("#budget"),
   itinerary: document.querySelector("#itinerary"),
   thread: document.querySelector("#thread-label"),
   calls: document.querySelector("#calls-label"),
 };
 
-const steps = ["flight", "hotel", "weather", "itinerary", "final"];
+const steps = ["flight", "hotel", "weather", "budget", "itinerary", "final"];
 let progressTimer = null;
 
 function showToast(message) {
@@ -70,6 +78,14 @@ function completeSteps() {
   steps.forEach((step) => updateStep(step, "done", "Complete"));
 }
 
+function pauseForApproval() {
+  window.clearInterval(progressTimer);
+  ["flight", "hotel", "weather", "budget", "itinerary"].forEach((step) => {
+    updateStep(step, "done", "Complete");
+  });
+  updateStep("final", "active", "Waiting for approval");
+}
+
 function failActiveStep() {
   window.clearInterval(progressTimer);
   const active = document.querySelector(".step-card.active");
@@ -88,8 +104,115 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function markdownCell(value) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "object") {
+    return JSON.stringify(value).replaceAll("|", "\\|");
+  }
+  return String(value).replaceAll("|", "\\|").replaceAll("\n", " ");
+}
+
+function structuredToMarkdown(value, title = "") {
+  if (Array.isArray(value)) {
+    if (!value.length) return title ? `### ${title}\n\nNo details returned.` : "No details returned.";
+
+    if (value.every((item) => item && typeof item === "object" && !Array.isArray(item))) {
+      const columns = [...new Set(value.flatMap((item) => Object.keys(item)))];
+      const header = `| ${columns.join(" | ")} |`;
+      const divider = `| ${columns.map(() => "---").join(" | ")} |`;
+      const rows = value.map(
+        (item) => `| ${columns.map((column) => markdownCell(item[column])).join(" | ")} |`
+      );
+      return `${title ? `### ${title}\n\n` : ""}${header}\n${divider}\n${rows.join("\n")}`;
+    }
+
+    return `${title ? `### ${title}\n\n` : ""}${value.map((item) => `- ${markdownCell(item)}`).join("\n")}`;
+  }
+
+  if (value && typeof value === "object") {
+    const sections = [];
+    const facts = [];
+
+    Object.entries(value).forEach(([key, item]) => {
+      const label = key.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+      if (item && typeof item === "object") {
+        sections.push(structuredToMarkdown(item, label));
+      } else {
+        facts.push(`**${label}:** ${markdownCell(item)}`);
+      }
+    });
+
+    return [title ? `### ${title}` : "", facts.join("\n\n"), ...sections]
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  return markdownCell(value);
+}
+
+function parseJsonText(value) {
+  const text = String(value ?? "").trim();
+  if (!(text.startsWith("{") || text.startsWith("["))) return null;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function unwrapMcpTextBlocks(value) {
+  if (Array.isArray(value)) {
+    const textBlocks = value.filter(
+      (item) => item && item.type === "text" && typeof item.text === "string"
+    );
+
+    if (textBlocks.length === value.length && textBlocks.length > 0) {
+      const text = textBlocks.map((item) => item.text).join("\n").trim();
+      return parseJsonText(text) ?? text;
+    }
+  }
+
+  if (value && typeof value === "object" && value.type === "text" && typeof value.text === "string") {
+    return parseJsonText(value.text) ?? value.text;
+  }
+
+  return value;
+}
+
+function responseToMarkdown(value) {
+  const unwrapped = unwrapMcpTextBlocks(value);
+  if (unwrapped !== value) return responseToMarkdown(unwrapped);
+  if (value && typeof value === "object") return structuredToMarkdown(value);
+
+  const text = String(value ?? "");
+  const parsed = parseJsonText(text);
+  if (parsed !== null) return responseToMarkdown(parsed);
+
+  if (text.includes("Current Weather:") && text.includes("Forecast:")) {
+    const currentStart = text.indexOf("Current Weather:") + "Current Weather:".length;
+    const forecastStart = text.indexOf("Forecast:", currentStart);
+    const current = parseJsonText(text.slice(currentStart, forecastStart));
+    const forecast = parseJsonText(text.slice(forecastStart + "Forecast:".length));
+
+    if (current !== null || forecast !== null) {
+      return [
+        current !== null
+          ? `### Current Weather\n\n${responseToMarkdown(current)}`
+          : "",
+        forecast !== null
+          ? `### Forecast\n\n${responseToMarkdown(forecast)}`
+          : "",
+      ].filter(Boolean).join("\n\n");
+    }
+  }
+
+  return text;
+}
+
 function formatResponse(value) {
-  const text = String(value ?? "")
+  const rawText = responseToMarkdown(value);
+  const text = rawText
     .replace(/&lt;(\/?think\b.*?)&gt;/gi, "<$1>")
     .replace(/<think\b[^>]*>[\s\S]*?(?:<\/think\s*>|$)/gi, "")
     .replace(/<\/think\s*>/gi, "")
@@ -115,11 +238,14 @@ function formatResponse(value) {
 function renderResults(data) {
   fields.thread.textContent = `Thread: ${data.thread_id || "--"}`;
   fields.calls.textContent = `Calls: ${data.llm_calls ?? "--"}`;
+  if (data.thread_id) threadInput.value = data.thread_id;
   fields.answer.innerHTML = formatResponse(data.answer);
   fields.flights.innerHTML = formatResponse(data.flight_results);
   fields.hotels.innerHTML = formatResponse(data.hotel_results);
   fields.weather.innerHTML = formatResponse(data.weather_results);
+  fields.budget.innerHTML = formatResponse(data.budget_results);
   fields.itinerary.innerHTML = formatResponse(data.itinerary);
+  renderApproval(data);
   document.querySelectorAll(".result-content table").forEach((table) => {
     const wrapper = document.createElement("div");
     wrapper.className = "result-table";
@@ -131,6 +257,63 @@ function renderResults(data) {
   });
   resultsPanel.hidden = false;
   resultsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderApproval(data) {
+  const payload = data.interrupt_payload;
+  const requiresApproval = data.requires_approval === true && payload;
+
+  approvalPanel.hidden = !requiresApproval;
+  if (!requiresApproval) return;
+
+  approvalQuestion.textContent = payload.question || "Please review the draft itinerary.";
+  approvalDraft.innerHTML = formatResponse(payload.draft_itinerary || data.itinerary);
+  approvalFeedback.value = "";
+  approveButton.disabled = false;
+  reviseButton.disabled = false;
+}
+
+async function submitApproval(event) {
+  event.preventDefault();
+
+  const submitter = event.submitter;
+  const approved = submitter?.dataset.approved === "true";
+  const human_feedback = approvalFeedback.value.trim();
+
+  if (!approved && !human_feedback) {
+    showToast("Add feedback before requesting changes.");
+    approvalFeedback.focus();
+    return;
+  }
+
+  approveButton.disabled = true;
+  reviseButton.disabled = true;
+  submitter.textContent = approved ? "Approving..." : "Sending...";
+
+  try {
+    const response = await fetch("/api/travel/resume", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        thread_id: threadInput.value.trim(),
+        approved,
+        human_feedback,
+      }),
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.detail || "Unable to resume the travel plan.");
+    }
+
+    completeSteps();
+    renderResults(payload);
+  } catch (error) {
+    approveButton.disabled = false;
+    reviseButton.disabled = false;
+    submitter.textContent = approved ? "Approve itinerary" : "Request changes";
+    showToast(error.message);
+  }
 }
 
 async function submitTravelRequest(event) {
@@ -160,7 +343,11 @@ async function submitTravelRequest(event) {
       throw new Error(payload.detail || "Unable to generate the travel plan.");
     }
 
-    completeSteps();
+    if (payload.requires_approval) {
+      pauseForApproval();
+    } else {
+      completeSteps();
+    }
     renderResults(payload);
   } catch (error) {
     failActiveStep();
@@ -191,3 +378,4 @@ document.querySelectorAll(".tab-button").forEach((button) => {
 });
 
 form.addEventListener("submit", submitTravelRequest);
+approvalForm.addEventListener("submit", submitApproval);

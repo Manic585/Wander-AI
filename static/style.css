@@ -364,9 +364,113 @@ input:focus {
   font-weight: 800;
 }
 
+.approval-panel {
+  margin-bottom: 18px;
+  padding: 20px;
+  border: 1px solid #a8d5f7;
+  border-radius: 8px;
+  background: #f2f9ff;
+}
+
+.approval-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: start;
+}
+
+.approval-heading h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.35rem;
+}
+
+.approval-badge {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #fff2d5;
+  color: var(--warning);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.approval-question {
+  margin: 12px 0;
+  color: #294a68;
+  font-weight: 700;
+}
+
+.approval-draft {
+  max-height: 430px;
+  overflow: auto;
+  margin-bottom: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.approval-draft :is(h1, h2, h3, h4, h5, h6) {
+  margin: 20px 0 10px;
+  color: var(--blue-strong);
+  font-size: 1.2rem;
+}
+
+.approval-draft > :first-child {
+  margin-top: 0;
+}
+
+.approval-form {
+  display: grid;
+  gap: 10px;
+}
+
+.approval-form label span {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.approval-form textarea {
+  min-height: 96px;
+}
+
+.approval-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.secondary-action {
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid #9bcdf6;
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--blue-strong);
+  font-weight: 800;
+}
+
+.secondary-action:hover {
+  background: #eaf5ff;
+}
+
+.secondary-action:disabled,
+.approval-actions .primary-action:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.approval-actions .primary-action {
+  min-height: 48px;
+  padding: 0 16px;
+  margin-top: 0;
+}
+
 .tabs {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 14px;
 }
@@ -492,7 +596,8 @@ input:focus {
   }
 
   .brand-row,
-  .result-header {
+  .result-header,
+  .approval-heading {
     flex-direction: column;
   }
 
@@ -504,5 +609,13 @@ input:focus {
 
   .run-meta {
     justify-content: flex-start;
+  }
+
+  .approval-actions {
+    flex-direction: column-reverse;
+  }
+
+  .approval-actions button {
+    width: 100%;
   }
 }

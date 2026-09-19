@@ -21,6 +21,12 @@ class TravelRequest(BaseModel):
     thread_id: str | None = None
 
 
+class TravelApprovalRequest(BaseModel):
+    thread_id: str
+    approved: bool
+    human_feedback: str = ""
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     return templates.TemplateResponse(request, "index.html")
@@ -56,6 +62,27 @@ def create_travel_plan(payload: TravelRequest):
                 ),
             ) from exc
 
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.post("/api/travel/resume")
+def resume_travel_plan(payload: TravelApprovalRequest):
+    thread_id = payload.thread_id.strip()
+
+    if not thread_id:
+        raise HTTPException(status_code=400, detail="Thread ID is required to resume the travel plan.")
+
+    try:
+        from backend import resume_travel_agent
+
+        return resume_travel_agent(
+            thread_id=thread_id,
+            approved=payload.approved,
+            human_feedback=payload.human_feedback.strip(),
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

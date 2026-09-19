@@ -92,6 +92,13 @@
               <p>Waiting</p>
             </div>
           </article>
+          <article class="step-card" data-step="budget">
+            <span class="step-dot"></span>
+            <div>
+              <h2>Budget Agent</h2>
+              <p>Waiting</p>
+            </div>
+          </article>
           <article class="step-card" data-step="itinerary">
             <span class="step-dot"></span>
             <div>
@@ -121,11 +128,41 @@
           </div>
         </div>
 
+        <section id="approval-panel" class="approval-panel" hidden aria-labelledby="approval-title">
+          <div class="approval-heading">
+            <div>
+              <p class="eyebrow">Human review</p>
+              <h3 id="approval-title">Review your draft itinerary</h3>
+            </div>
+            <span class="approval-badge">Action needed</span>
+          </div>
+          <p id="approval-question" class="approval-question"></p>
+          <div id="approval-draft" class="approval-draft"></div>
+          <form id="approval-form" class="approval-form">
+            <label for="approval-feedback">Feedback <span>(optional when approving)</span></label>
+            <textarea
+              id="approval-feedback"
+              rows="4"
+              maxlength="1200"
+              placeholder="Tell us what should change if you want a revision."
+            ></textarea>
+            <div class="approval-actions">
+              <button id="revise-button" class="secondary-action" type="submit" data-approved="false">
+                Request changes
+              </button>
+              <button id="approve-button" class="primary-action" type="submit" data-approved="true">
+                Approve itinerary
+              </button>
+            </div>
+          </form>
+        </section>
+
         <div class="tabs" role="tablist" aria-label="Travel plan sections">
           <button class="tab-button active" type="button" role="tab" aria-selected="true" data-target="answer">Final Plan</button>
           <button class="tab-button" type="button" role="tab" aria-selected="false" data-target="flights">Flights</button>
           <button class="tab-button" type="button" role="tab" aria-selected="false" data-target="hotels">Hotels</button>
           <button class="tab-button" type="button" role="tab" aria-selected="false" data-target="weather">Weather</button>
+          <button class="tab-button" type="button" role="tab" aria-selected="false" data-target="budget">Budget</button>
           <button class="tab-button" type="button" role="tab" aria-selected="false" data-target="itinerary">Itinerary</button>
         </div>
 
@@ -133,6 +170,7 @@
         <article id="flights" class="result-content" role="tabpanel"></article>
         <article id="hotels" class="result-content" role="tabpanel"></article>
         <article id="weather" class="result-content" role="tabpanel"></article>
+        <article id="budget" class="result-content" role="tabpanel"></article>
         <article id="itinerary" class="result-content" role="tabpanel"></article>
       </section>
     </main>
