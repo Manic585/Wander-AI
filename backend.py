@@ -141,7 +141,7 @@ if not GROQ_API_KEY:
     )
 
 llm = ChatGroq(
-    model="openai/gpt-oss-120b",
+    model="openai/gpt-oss-safeguard-20b",
     api_key=GROQ_API_KEY,
     max_tokens=4096,
     reasoning_format="hidden",
@@ -647,7 +647,9 @@ def get_interrupt_payload(result: dict[str, Any]) -> dict[str, Any] | None:
     if not interrupts:
         return None
 
-    interrupt_item = interrupts[0] if isinstance(interrupts, (list, tuple)) else interrupts
+    interrupt_item = (
+        interrupts[0] if isinstance(interrupts, (list, tuple)) else interrupts
+    )
     payload = getattr(interrupt_item, "value", interrupt_item)
 
     if isinstance(payload, dict):
@@ -725,7 +727,7 @@ def resume_travel_agent(thread_id: str, approved: bool, human_feedback: str):
 
     config = {"configurable": {"thread_id": thread_id.strip()}}
     result = travel_graph.invoke(
-        Command(resume={"approved": approved, "human_feedback": human_feedback}),
+        Command(resume={"approved": approved, "feedback": human_feedback}),
         config=config,
     )
 
